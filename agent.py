@@ -51,6 +51,7 @@ class SillyWalker:
 
     def reset(self):
         self._env.reset()
+        self.done = False
 
     @property
     def state(self):
@@ -75,20 +76,27 @@ class SillyWalker:
 if __name__ == '__main__':
     walker = SillyWalker()
 
-    # for _ in range(1000):
-    while not walker.done:
-        walker.step()
-        # walker.reset()
+    for _ in range(100):
+        while not walker.done:
+            walker.step()
+        walker.reset()
+
+    def scoring(y_real, y_predicted):
+        return y_predicted[-1]
 
     x = np.array(walker.state_history[:-1])
     y = np.array([list(a) + [r] for a, r in zip(walker.action_history,
                                                 walker.reward_history)])
 
-    x_train, x_test, y_train, y_test = train_test_split(x, y,
-                                                        train_size=3/4,
-                                                        test_size=1/4)
+    model = TPOTRegressor(generations=5, population_size=20,
+                          scoring=scoring, verbosity=2)
+    model.fit(x, y)
 
-    model = TPOTRegressor(generations=5, population_size=20, verbosity=2)
-    model.fit(x_train, y_train)
-    print(model.score(x_test, y_test))
-    model.export('predict.py')
+    while not walker.done:
+        s = np.array([walker.state])
+        prediction = model.predict(s)[0]
+        print(prediction)
+
+        action = Action(*prediction[:-1])
+        walker.step(action)
+        walker._env.render()
