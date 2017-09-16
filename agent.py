@@ -1,10 +1,7 @@
+import pickle
 from typing import NamedTuple
 
 import gym
-import numpy as np
-
-from tpot import TPOTRegressor
-from sklearn.model_selection import train_test_split
 
 
 class Action(NamedTuple):
@@ -50,8 +47,14 @@ class SillyWalker:
         self.state, self.reward, self.done, _ = self._env.step(action)
 
     def reset(self):
-        self._env.reset()
         self.done = False
+        return self._env.reset()
+
+    def full_reset(self):
+        self.action_history.clear()
+        self.reward_history.clear()
+        self.state_history.clear()
+        self.state = self.reset()[:14]
 
     @property
     def state(self):
@@ -72,63 +75,13 @@ class SillyWalker:
         self.reward_history.append(new_reward)
         self._reward = new_reward
 
+    def save_history(self, filename):
+        with open(filename, 'wb') as f:
+            pickle.dump((self.action_history,
+                         self.reward_history,
+                         self.state_history), f)
 
-if __name__ == '__main__':
-    from neupy import algorithms, layers
-
-    walker = SillyWalker()
-
-    for i in range(50):
-        print('generating data:', i)
-        while not walker.done:
-            walker.step()
-        walker.reset()
-
-    x = np.array([list(s) + [r] for s, r in zip(walker.state_history[:-1],
-                                                walker.reward_history)])
-
-    y = np.array(walker.action_history)
-
-    print(x.shape, y.shape)
-
-    x_train, x_test, y_train, y_test = train_test_split(
-        x, y, train_size=(90 / 100),
-    )
-
-    print(x_train.shape, x_test.shape, y_train.shape, y_test.shape)
-
-    def check_goal(goal):
-        def callback(net):
-            if net.errors.last() < goal:
-                raise StopTraining("Goal reached")
-
-        return callback
-
-    net = algorithms.MinibatchGradientDescent(
-        [
-            layers.Input(15),
-            layers.Relu(10),
-            layers.Relu(4),
-        ],
-        error='mse',
-        step=0.1,
-        verbose=True,
-        show_epoch='10 times',
-        epoch_end_signal=check_goal(0.01),
-    )
-
-    net.architecture()
-
-    net.train(x_train, y_train, x_test, y_test, epochs=1000)
-
-    walker.reset()
-
-    while not walker.done:
-        s = np.array([list(walker.state) + [1]])
-        prediction = net.predict(s)[0]
-
-        print(prediction)
-
-        action = Action(*prediction)
-        walker.step(action)
-        walker._env.render()
+    @staticmethod
+    def load_history(filename):
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
