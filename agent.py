@@ -74,29 +74,61 @@ class SillyWalker:
 
 
 if __name__ == '__main__':
+    from neupy import algorithms, layers
+
     walker = SillyWalker()
 
-    for _ in range(100):
+    for i in range(50):
+        print('generating data:', i)
         while not walker.done:
             walker.step()
         walker.reset()
 
-    def scoring(y_real, y_predicted):
-        return y_predicted[-1]
-
-    x = np.array(walker.state_history[:-1])
-    y = np.array([list(a) + [r] for a, r in zip(walker.action_history,
+    x = np.array([list(s) + [r] for s, r in zip(walker.state_history[:-1],
                                                 walker.reward_history)])
 
-    model = TPOTRegressor(generations=5, population_size=20,
-                          scoring=scoring, verbosity=2)
-    model.fit(x, y)
+    y = np.array(walker.action_history)
+
+    print(x.shape, y.shape)
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, train_size=(90 / 100),
+    )
+
+    print(x_train.shape, x_test.shape, y_train.shape, y_test.shape)
+
+    def check_goal(goal):
+        def callback(net):
+            if net.errors.last() < goal:
+                raise StopTraining("Goal reached")
+
+        return callback
+
+    net = algorithms.MinibatchGradientDescent(
+        [
+            layers.Input(15),
+            layers.Relu(10),
+            layers.Relu(4),
+        ],
+        error='mse',
+        step=0.1,
+        verbose=True,
+        show_epoch='10 times',
+        epoch_end_signal=check_goal(0.01),
+    )
+
+    net.architecture()
+
+    net.train(x_train, y_train, x_test, y_test, epochs=1000)
+
+    walker.reset()
 
     while not walker.done:
-        s = np.array([walker.state])
-        prediction = model.predict(s)[0]
+        s = np.array([list(walker.state) + [1]])
+        prediction = net.predict(s)[0]
+
         print(prediction)
 
-        action = Action(*prediction[:-1])
+        action = Action(*prediction)
         walker.step(action)
         walker._env.render()
