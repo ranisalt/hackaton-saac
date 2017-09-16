@@ -2,5 +2,11 @@
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 
+[packages]
+pandas = "*"
+TPOT = "*"
+deap = "*"
+neupy = "*"
+
 [packages.gym]
 extras = [ "all",]
