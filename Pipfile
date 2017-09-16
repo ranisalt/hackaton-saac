@@ -2,6 +2,5 @@
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 
-[packages]
-gym = "*"
-Box2D = "*"
+[packages.gym]
+extras = [ "all",]
