@@ -1,10 +1,8 @@
+import pickle
+
 from typing import NamedTuple
 
 import gym
-import numpy as np
-
-from tpot import TPOTRegressor
-from sklearn.model_selection import train_test_split
 
 
 class Action(NamedTuple):
@@ -53,6 +51,11 @@ class SillyWalker:
         self._env.reset()
         self.done = False
 
+    def clear_history(self):
+        self.action_history.clear()
+        self.reward_history.clear()
+        self.state_history.clear()
+
     @property
     def state(self):
         return self._state
@@ -72,31 +75,13 @@ class SillyWalker:
         self.reward_history.append(new_reward)
         self._reward = new_reward
 
+    def save_history(self, filename):
+        with open(filename, 'wb') as f:
+            pickle.dump((self.action_history,
+                         self.reward_history,
+                         self.state_history), f)
 
-if __name__ == '__main__':
-    walker = SillyWalker()
-
-    for _ in range(100):
-        while not walker.done:
-            walker.step()
-        walker.reset()
-
-    def scoring(y_real, y_predicted):
-        return y_predicted[-1]
-
-    x = np.array(walker.state_history[:-1])
-    y = np.array([list(a) + [r] for a, r in zip(walker.action_history,
-                                                walker.reward_history)])
-
-    model = TPOTRegressor(generations=5, population_size=20,
-                          scoring=scoring, verbosity=2)
-    model.fit(x, y)
-
-    while not walker.done:
-        s = np.array([walker.state])
-        prediction = model.predict(s)[0]
-        print(prediction)
-
-        action = Action(*prediction[:-1])
-        walker.step(action)
-        walker._env.render()
+    @staticmethod
+    def load_history(filename):
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
