@@ -3,7 +3,6 @@ import numpy as np
 
 
 env = gym.make('BipedalWalker-v2')
-# env.reset()
 
 while True:
     env.reset()
